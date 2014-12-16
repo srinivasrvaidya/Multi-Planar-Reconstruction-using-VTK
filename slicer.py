@@ -10,13 +10,12 @@ DEBUG_MODE = 0
 #-------- Initialization ------------------
 
 worldPicker = vtk.vtkWorldPointPicker()
-clickPoints = [[0 for x in range(3)] for x in range(10)]
+clickPointsList = []
 renderer = vtk.vtkRenderer()
 aslice = range(10)
 color = range(10)
 actor = range(10)
-c1 = 0
-ren = range(4)
+mpv_renderer = range(4)
 
 
 # Start by loading some data.
@@ -62,7 +61,11 @@ sagittal.DeepCopy((0, 0,-1, center[0],
                    1, 0, 0, center[1],
                    0,-1, 0, center[2],
                    0, 0, 0, 1))          
-          
+
+#Oblique slice.
+obliqueSlice = vtk.vtkImageReslice()
+obliqueSlice.SetInputConnection(reader.GetOutputPort())
+obliqueSlice.SetOutputDimensionality(2)            
 
 # Extract a slice in the desired orientation
 reslice_axial = vtk.vtkImageReslice()
@@ -77,6 +80,7 @@ reslice_coronal.SetInputConnection(reader.GetOutputPort())
 reslice_coronal.SetOutputDimensionality(2)
 reslice_coronal.SetResliceAxes(coronal)
 reslice_coronal.SetInterpolationModeToLinear()
+
 
 # Extract a slice in the desired orientation
 reslice_sagittal = vtk.vtkImageReslice()
@@ -123,6 +127,22 @@ color_sagittal.SetInputConnection(reslice_sagittal.GetOutputPort())
 actor_sagittal = vtk.vtkImageActor()
 actor_sagittal.SetInput(color_sagittal.GetOutput())
 
+#ObliqueSlice
+obliqueSlice.SetResliceAxesOrigin(center[0], center[1], center[2])
+		
+obliqueSlice.SetResliceAxesDirectionCosines(1, 0,  0, 
+										0, math.cos(math.radians(45)),  -math.sin(math.radians(45)),
+										0, math.sin(math.radians(45)),  math.cos(math.radians(45)) )
+obliqueSlice.SetInterpolationModeToLinear()
+
+color_oblique = vtk.vtkImageMapToColors()
+color_oblique.SetLookupTable(table)
+color_oblique.SetInputConnection(obliqueSlice.GetOutputPort())
+		
+		
+actor_oblique = vtk.vtkImageActor()
+actor_oblique.SetInput(color_oblique.GetOutput())
+#actor[i].SetPosition(setLocation[i],0,0)
 
 
 #-----------------------------------------------------------------
@@ -148,10 +168,9 @@ def findAngleBetweenTwoPoints(startPoint, endPoint):
 		return math.degrees(numpy.arctan( delY / delX ))
 	
 
-def computeMPR(endPoints):
+def computeMPR(endPoints, plane, planeAngle):
 
-#	numberOfSlices = len(endPoints)-1
-	numberOfSlices = c1-1
+	numberOfSlices = len(endPoints)-1
 	points = [[0 for x in range(3)] for x in range(len(endPoints)-1)]
 
 	angle = range(numberOfSlices)
@@ -160,6 +179,8 @@ def computeMPR(endPoints):
 
 	setLocation = range(numberOfSlices)
 	distance = range(numberOfSlices)
+
+	print "-", planeAngle
 
 	for i in range(0, numberOfSlices):	
 		for j in range(0,3):
@@ -182,11 +203,8 @@ def computeMPR(endPoints):
 		extentLength[i][0] =  distance[i] #* 0.95 
 		extentLength[i][1] = 94 
 		temp += distance[i]
-		setLocation[i] = temp  * 0.05
+		setLocation[i] = temp  #* 0.05
 		
-#	extentLength = [[15,94],[18,94],[15,94]]
-#	setLocation = [0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-
 	for i in range(0, numberOfSlices):
 		
 		aslice[i] = vtk.vtkImageReslice()
@@ -197,8 +215,8 @@ def computeMPR(endPoints):
 										points[i][2] * aslice[i].GetOutput().GetSpacing()[2])
 		
 		aslice[i].SetResliceAxesDirectionCosines(1, 0,  0, 
-												0, math.cos(math.radians(90)),  -math.sin(math.radians(90)),
-												0, math.sin(math.radians(90)),  math.cos(math.radians(90)) )
+												0, math.cos(math.radians( float(planeAngle) )),  -math.sin(math.radians( float(planeAngle)) ),
+												0, math.sin(math.radians( float(planeAngle) )),  math.cos(math.radians( float(planeAngle) )) ) 
 		aslice[i].SetInterpolationModeToLinear()
 		
 		transform = vtk.vtkTransform() # rotate about the center of the image
@@ -224,9 +242,6 @@ def computeMPR(endPoints):
 		
 	#	renderer.AddActor2D(actor[i])
 		
-		
-
-
 #----------------------------------------------------------------------------------
 
 # --- multi-view ---
@@ -310,32 +325,65 @@ def MouseMoveCallback(obj, event):
       
 def LeftButtonPressEvent(obj,event):
 		
-		global ren, smart, mode , clickPoints
-		global c1
+		global ren, smart, mode , clickPoints, polygonActor, polygon, polygonMapper, renderer
+		
+		points = vtk.vtkPoints()
+		points.SetNumberOfPoints(6)
+		
 		
 		x, y  = obj.GetInteractor().GetEventPosition()
-		worldPicker.Pick(x,y,0,ren[1])
+		worldPicker.Pick(x,y,0,mpv_renderer[1])
 		worldPos = worldPicker.GetPickPosition()
 		singleClickedPoint = [worldPos[0]+center[0], worldPos[1]+center[1], worldPos[2]+center[2]]		
 		
-		for i in range(0,3):
-			clickPoints[c1][i] = singleClickedPoint[i]
+		clickPointsList.append(singleClickedPoint)
 		
-		c1 = c1 + 1
-
+		displayClickPoints(clickPointsList)
+		
 		if DEBUG_MODE:
 			print "Screen Coordinates:: ", x, y	
 			print "Mode:: ",mode
 			print "Real world co-ordinates:: ",worldPos[0]+center[0], worldPos[1]+center[1], worldPos[2]+center[2]		
 			print "ClickPoints:: "
-			for i in range(0,c1-1):
-				print " ",clickPoints[i]
-		#	obj.OnLeftButtonDown()
+			print " ",clickPointsList
+			#	obj.OnLeftButtonDown()
 		return        
+
+def displayClickPoints(clickPoints):
+	
+	points = vtk.vtkPoints()
+	lines = vtk.vtkCellArray()
+	polygon = vtk.vtkPolyData()
+	polygonMapper = vtk.vtkPolyDataMapper()
+	polygonActor = vtk.vtkActor()
+		
+	points.SetNumberOfPoints(4)
+	points.SetPoint(0, 0.0, -1.0, 0.0)
+	points.SetPoint(1, -0.7, -0.5, 0.0)
+	points.SetPoint(2,   0.7,  0.5, 0.0)
+	points.SetPoint(3, 0.0,  -1.0, 0.0)
+
+		
+	lines.InsertNextCell(4)
+	lines.InsertCellPoint(0)
+	lines.InsertCellPoint(1)
+	lines.InsertCellPoint(2)
+	lines.InsertCellPoint(3)
+		
+	polygon.SetPoints(points)
+	polygon.SetLines(lines)
+		
+	polygonMapper.SetInputConnection(polygon.GetProducerPort())
+	polygonActor.SetMapper(polygonMapper)	
+	
+	mpv_renderer[1].ResetCamera()
+	mpv_renderer[1].AddActor(polygonActor)
+	rw.Render()
+		
 
 def KeyPressEvent(obj, event):
 
-	global c1, actor, mpr_rw, renderer
+	global actor, mpr_rw, renderer, singleClickedPoint, points
 
 	keyCode = obj.GetKeyCode()
 
@@ -344,29 +392,25 @@ def KeyPressEvent(obj, event):
 		
 	if keyCode in ['r', 'R']:   # Render_Mode
 		
-		computeMPR(clickPoints)
-		renderer.ResetCamera()
-
-		for i in range(0, c1 - 1):
+	#	computeMPR(clickPointsList, "Axial", 90)
+		computeMPR(clickPointsList, "Axial", 90)
+		renderer.ResetCamera()		
+		
+		for i in range(0, len(clickPointsList) - 1):
 			renderer.AddActor2D(actor[i])    
-
+		
 		mpr_rw.AddRenderer(renderer)
-		mpr_rw.Render()
+		mpr_rw.Render()	
 
 	if keyCode in ['c','C']:    # ViewPort Clear Mode & Reset
 		
-		for i in range(0, c1 - 1):
-			renderer.RemoveActor2D(actor[i]) 
-
+		for i in range(0, len(clickPointsList) - 1):
+			renderer.RemoveActor2D(actor[i])
+		
 		mpr_rw.AddRenderer(renderer)
 		mpr_rw.Render()
-		
-		c1 = 0
-		
-		for i in range(0, 10):
-			clickPoints[i][0] = clickPoints[i][1] = clickPoints[i][2] = 0
-
-
+				
+		del clickPointsList[:]
 
 #------ CALL BACK REGISTRATION --------------
 
@@ -377,78 +421,48 @@ interactorStyle.AddObserver("LeftButtonPressEvent", LeftButtonPressEvent)
 interactor.AddObserver("KeyPressEvent", KeyPressEvent)
         
 #------ Define viewport ranges ---------------
+
 xmins=[0, .5 , 0, .5]
 xmaxs=[0.5, 1, 0.5, 1]
 ymins=[0, 0 ,.5, .5]
 ymaxs=[0.5, 0.5 ,1 ,1]
 
-points = [[20,60,47],[20,20,47],[40,20,47],[60,60,47]]  # |_|
-#points = [[12, 0, 47],[32, 32, 47],[10, 32, 47]] #,[50,10,47],[50,50,47]]  # |\|
-
-#points = [[0,32,47],[13,12,47],[43,62,47]] #,[33,25,47]] #,[33,30,47],[33,35,47]]
-
-#points = [[20*3.2, 40*3.2, 47*1.5],[20*3.2 , 20*3.2, 47*1.5],[40*3.2, 20*3.2, 47*1.5],[40*3.2, 40*3.2, 47*1.5]]
-#points =[[20,30,47],[30,20,47],[40,30,47], [60, 40, 47]]
-#points = [[0,60,47],[20,20,47],[40,20,47],[60,20,47]]
+points = [[20,60,47],[20,20,47],[40,20,47],[60,60,47]] 
 
 numberOfSlices = len(points) - 1
 
-'''
-aslice = range(numberOfSlices)
-color = range(numberOfSlices)
-actor = range(numberOfSlices)
-'''
-
-'''
-computeMPR(points)
-
-for i in range(0, numberOfSlices-1):
-	print ":::::",i
-	renderer.AddActor2D(actor[i])    
-
-mpr_rw.AddRenderer(renderer)      
-'''
-
-'''
-angle = [0, 90,0,-90, 0]
-extentLength = [[25,94],[15,94],[15,94],[15,94],[25, 94]]
-setLocation = [20,10,0,-10,-20]
-
-computeMPR(points, angle, extentLength, setLocation)
-'''
-
 for i in range(0, 4):	
-	ren[i] = vtk.vtkRenderer()
-	ren[i].SetViewport(xmins[i],ymins[i],xmaxs[i],ymaxs[i])
+	mpv_renderer[i] = vtk.vtkRenderer()
+	mpv_renderer[i].SetViewport(xmins[i],ymins[i],xmaxs[i],ymaxs[i])
+
+mpv_renderer[1].SetUseDepthPeeling(1)
+mpv_renderer[1].SetOcclusionRatio(0.5)
 
 
-'''	
-points =[[20,30,47],[30,20,47],[40,30,47]]
-angle = [90,0,-90]
-extentLength = [[64,94],[64,94],[64,94]]
-setLocation = [0,0,0]
-
-computeMPR(points, angle, extentLength, setLocation)
-'''
-
-
-ren[2].AddViewProp(slicer2.volume)
-camera = ren[2].GetActiveCamera()
+mpv_renderer[2].AddViewProp(slicer2.volume)
+camera = mpv_renderer[2].GetActiveCamera()
 c = slicer2.volume.GetCenter()
 camera.SetFocalPoint(c[0], c[1], c[2])
 camera.SetPosition(c[0] + 400, c[1], c[2])
 camera.SetViewUp(0, 0, -1)
 
+appendData = vtk.vtkAppendPolyData()
+appendData.AddInputConnection(sphere.GetOutputPort())
 
-ren[1].AddActor2D(actor_axial)
-ren[3].AddActor2D(actor_coronal)
-ren[0].AddActor2D(actor_sagittal)
+
+displayClickPoints(clickPointsList)
+#mpv_renderer[1].AddActor2D(actor_axial)
+mpv_renderer[3].AddActor2D(actor_oblique)
+mpv_renderer[0].AddActor2D(actor_sagittal)
 
 for i in range(0,4):
-	rw.AddRenderer(ren[i])
+	rw.AddRenderer(mpv_renderer[i])
 
+rw.SetWindowName("Multi Planar Viewer Window")
 rw.SetSize(600, 600)
 rw.Render()
+
+mpr_rw.SetWindowName("Multi Planar Reconstruction Window")
 mpr_rw.SetSize(600, 300)
 mpr_rw.Render()
 
