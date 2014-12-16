@@ -42,7 +42,7 @@ if DEBUG_MODE:
 	print "Center: ", center
 	print "(xMin, xMax, yMin, yMax, zMin, zMax)", xMin, xMax, yMin, yMax, zMin, zMax          
           
-# ------------- Basic Planes ------------------------------
+# ------------- Basic Planes -----------------------------
          
 axial = vtk.vtkMatrix4x4()
 axial.DeepCopy((1, 0, 0, center[0],
