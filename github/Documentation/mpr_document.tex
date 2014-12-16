@@ -1,0 +1,271 @@
+%\documentclass[12pt]{article}
+\documentclass[12pt]{report}
+\usepackage[margin=1.0in]{geometry}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=red,
+    urlcolor=black
+}
+
+\title{\textbf{ \textcolor{red}{Project Report \\ on \\Multi-Planar Reconstruction using VTK } }}
+\author{
+\vspace{ 2 mm}\\
+Supervised By : \textbf{Prof. Srikanth T.K}\\
+\vspace {2mm}\\
+\textbf{Submitted by:} \\
+srinivas.r.vaidya\\
+(MT2013152) \\
+\vspace{ -2 mm}\\	
+\textbf{@iiitb.org}}
+\date{14 - December - 2014}
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\vspace{ 100 mm}
+\chapter{Introduction}
+\section{\textcolor{blue}{Objective} }
+
+In medical imaging computed tomography (CT) and magnetic resonance imaging (MRI) provide three-dimensional volumetric data sets of the human body, which contain these objects of interest. The data gained from CT and MRI, however, contain many objects of less or no interest. This makes volume-rendering without preprocessing often impossible or inaccurate. Furthermore the objects of interest are hardly located entirely within a single plane. One way to display tubular structures for diagnostic purposes is to generate longitudinal cross-sections in order to show lumen, wall, and surrounding tissue in a curved plane. This process is called Curved Planar Reformation (CPR). This process is sometimes referred to as Multi Planar Reformation (MPR).
+
+\section{\textcolor{blue}{Motivation} }
+
+MPR are routinely used in examinations of the CP angles and cranial nerves, pituitary gland, solitary and multiple space occupying lesions of the brain, in the knee joint, and for examining the kypho-scoliotic spine[1]. 
+
+\chapter{Functionality}
+\section{\textcolor{blue}{Multi Planar Viewer Window} }
+
+The window of the Multi Planar Viewer is divided into 4 parts: \\
+
+\begin{itemize}
+\item Top right renderer displays 3D dataset. \\
+\item Top left renderer displays an oblique axial plane. \\
+\item Bottom left renderer displays sagittal plane. \\
+\item Bottom right renderer displays axial plane. \\
+\end{itemize}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.35\textwidth]{mpv.jpeg}
+\caption{Multi Planar Viewer Window}
+\end{figure}
+
+
+\section{\textcolor{blue}{Screen Pick Points} }
+User can pick points to draw a polyline on any plane in multiplanar viewer window to reconstruct a multiplanar image. User can also clear the previously drawn polyline, and a draw a fresh polyline.
+
+\section{\textcolor{blue}{MultiPlanar Reconstruction from standard plane} }
+The window displays MultiPlanar Reconstruction image generated from the polyline plotted on stadard plane(axial, sagittal) by user. 
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.35\textwidth]{mpr.jpeg}
+\caption{Multi Planar Viewer Window, shows MPR generated from points draw on axial plane}
+\end{figure}
+
+\section{\textcolor{blue}{MultiPlanar Reconstruction from oblique plane} }
+The window displays MultiPlanar Reconstruction image generated from the polyline plotted by user on an oblique plane. 
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.35\textwidth]{ob.png}
+\caption{Multi Planar Viewer Window, shows MPR generated from points draw on oblique plane (45$ \circ $ to axial plane)}
+\end{figure}
+
+\vspace{70pt}
+
+\section{\textcolor{blue}{Zoom} }
+User can change the zoom level in all planar views in multiplanar viewer window and in multiplanar reconstruction window.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.35\textwidth]{zoom.jpeg}
+\caption{Multi Planar Viewer Window}
+\end{figure}
+
+
+\section{\textcolor{blue}{Rotation} }
+All planar views in multiplanar viewer window and in multiplanar reconstruction window can be rotated.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.35\textwidth]{r.jpeg}
+\caption{Multi Planar Viewer Window}
+\end{figure}
+
+
+\vspace{200pt}
+
+\section{\textcolor{blue}{Traverse View} }
+All planar views in multiplanar viewer window can be traversed with up and down with constant depth(which can be programmed).
+
+\begin{figure}[h]
+\centering
+\subfloat[]{\includegraphics[width=0.25\textwidth]{01.jpeg} }
+\subfloat[]{\includegraphics[width=0.25\textwidth]{02.jpeg} }
+\subfloat[]{\includegraphics[width=0.25\textwidth]{03.jpeg} }
+%\caption{Traverse view of sagittal plane}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\subfloat[]{\includegraphics[width=0.25\textwidth]{11.png} }
+\subfloat[]{\includegraphics[width=0.25\textwidth]{12.png} }
+\subfloat[]{\includegraphics[width=0.25\textwidth]{13.png} }
+\caption{Traverse views of sagittal plane}
+\end{figure}
+
+\chapter{System Design}
+\section{\textcolor{blue}{Algorithm to obtain MPR} }
+\textbf{Step 1:} User pick points to draw a polyline(or piecewise linear curve) on any plane. \\
+\textbf{Step 2:} Corresponding world space coordinates of the clicked screen coordinates is obtainted. \\
+\textbf{Step 3:} If user has plotted n points, then are (n-1) edges. Length of each edge is computed by calculating (euclidean) distance between two vertices of edge.  \\
+\textbf{Step 4:} Angle of each edge is computed.   \\
+\textbf{Step 5:} Using angle and normal information of the plane on which this points are plotted, the orientation of the slicer is calculated and a slice is obtained. \\
+\textbf{Step 6:} Using distance(as obtained by step 3), the slice is stripped to obtain only area of interest. \\
+\textbf{Step 7:} Repeat Step 3 to Step 6 for every edge in the polyline. \\
+\textbf{Step 8:} Using distance(as obtained by step 3) render window location of final stripped slice is determined.\\
+\textbf{Step 9:} Render to view MPR
+
+
+\section{\textcolor{blue}{Code description} }
+\subsection{\textcolor{blue}{Variables} }
+
+\begin{itemize}
+\item 
+\textit{clickPointsList:} A list which holds user click points in world space coordinates.   \\
+\item
+\textit{aSlice:} List of vtkImageReslice class object, each objects  interpolation method, reslice axis, OutputDimensionality are set, and reads data directly from vtkVolume16Reader. \\
+\item
+\textit{color:} List of vtkImageMapToColors class object, each objects lookuptable is set to a vtkLookupTable object. color object fetchs input from aslice object.\\
+\item
+\textit{actor:} List of vtkImageActor class object. Each actor object inputs data from color object.  \\
+\item
+\textit{mpv\_renderer:} List of 4 objects of vtkRenderer class, which are responsible for 4 renderers in multiplanar viewer window. \\
+\item
+\textit{numberOfSlices:} Holds number of slices that is composed to obtain final MPR image. Its value is  (no:of click points) - 1 \\
+\item
+\textit{extendLength:} A List which specify the extent length(strip excess or unimportant part) of each slice \\ 
+\item
+\textit{setLocation:} A List which specify render window location of each slice strip.
+
+\end{itemize}
+
+\subsection{\textcolor{blue}{Procedures} }
+\begin{itemize}
+\item
+\underline{findDistanceBetweenTwoPoints:} returns euclidean distance between two vertices which is passed to this function \\
+\item
+\underline{findAngleBetweenTwoPoints:} returns angle between two vertices which is passed to this function \\
+\item
+\underline{computeMPR:} this function performs main algorithm. Three parameters passed are click points, standard plane on which points are drawn, oblique angle( = 0; if operating in standard plane) \\
+\item
+\underline{displayClickPoints:} displays polyline from user click points \\
+\item
+\underline{Mouse handler functions:} \\
+- MouseMoveCallback \\
+- LeftButtonPressEvent \\
+\item
+\underline{Keyboard handler function:} \\
+- KeyPressEvent \\
+\\
+\\
+\\
+\\
+\\
+\\
+\end{itemize}
+
+%displayClickPoints
+
+\subsection{\textcolor{blue}{Data flow in VTK Pipeline} }
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{vtk.png}
+\caption{Data flow in Visualization Toolkit pipelne performed for each edge in polyline. }
+\end{figure}
+
+
+\chapter{How to run}
+\section{\textcolor{blue}{Tools \& Installation} }
+On linux machine install python-vtk and python:\\
+\\
+\$sudo apt-get install python
+\\
+\$sudo apt-get install libvtk5-dev python-vtk
+\\
+\\
+To test if python-vtk is correctly installed, the following command should start python-vtk interpreter. 
+\\
+\$python-vtk
+\\
+\\
+If still unable to run python-vtk interpreter, then
+\\
+\$sudo apt-get update
+\\
+will resolve any dependencies.
+
+\section{\textcolor{blue}{Where to get the source code} }
+
+Fork the repository or one could download the source code from the link given below:
+\\
+\\
+\href{https://github.com/srinivasrvaidya/Multi-Planar-Reconstruction-using-VTK}{https://github.com/srinivasrvaidya/Multi-Planar-Reconstruction-using-VTK}
+
+\section{\textcolor{blue}{How to run the code} }
+After installation, move to folder containing the source code. 
+\\
+\\
+\$python slicer.py
+\\
+\\
+Two windows, \\1) Multiplanar viewer window, and
+\\
+2) Multiplanar reconstruction window, pop up.
+
+\section{\textcolor{blue}{How to plot points and render MPR} }
+On any plane in the multiplanar viewer window using mouse, pick points. \\
+To render, press "R" or "r"
+
+\section{\textcolor{blue}{How to clear MPR} }
+To clear MPR, press "C" or "c"
+
+\section{\textcolor{blue}{How to rotate the MPR image} }
+Left mouse button down, and move the curser to get desired orientation.
+
+\section{\textcolor{blue}{How to traverse the planar view} }
+Click on the desired plane, and use scroll to traverse up or down.
+
+
+\chapter{Challenges faced, and what have been left open}
+
+\textbf{Some of challeges faced are,}\\
+- To generate oblique MPR  \\
+- To set location of slice actor on the render window. \\
+- To strip the desired location of the slice  \\
+- To get world coordinates from screen coordinates.
+\\
+\\
+\textbf{Some functionality left open,}\\
+- To display polyline plotted by user. \\(Soln: Need to Append all your polygonal geometry with vtkAppendPolyData and pass it to vtkDepthSortPolyData.) \\
+- Number of slices $\ge$ 5; size of strip displayed on MPR window decreases. \\
+(This issue could be error in setLocation, or auto truncation by vtk, or both)\\
+
+
+
+\chapter{References} 
+
+[1] \textit{"Multi-planar Reconstructions in Routine Applications"} by Greg Brown, published at www.users.on.net 
+
+\end{document}
